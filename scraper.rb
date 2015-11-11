@@ -33,9 +33,10 @@ number_of_pages.times do |num_of_page|
   puts "Started scraping page #{num_of_page + 1}"
   # car companies more info links
   puts "scanning companies..."
-  company_links1 = b144_current_page.search("a.rndtb_2 .rnd_float").map(&:parent)
-  company_links2 = b144_current_page.search("a.rndtb2_2 .rnd_float").map(&:parent)
-  company_links = (company_links1 + company_links2).flatten
+  company_links = b144_current_page.search("#baseMasterContent_Content_dvMainResult .card-hdl").map(&:parent)
+  company_links.delete_if { |link| link.name != 'a' }
+  # company_links2 = b144_current_page.search("a.rndtb2_2 .rnd_float").map(&:parent)
+  company_links = company_links.flatten
   puts "#{company_links.size} were found \n\n"
 
   puts "Connecting to each company page and see if it has a website \n\n"
@@ -47,15 +48,16 @@ number_of_pages.times do |num_of_page|
     company_page = agent.get(link.attributes["href"].value)
     puts "Connect to page #{index + 1}! \n\n"
 
-    company_name = company_page.at(".dvm11").text
-    company_website_link = company_page.at("[itemprop=url]")
+    company_name = company_page.at(".business-value h1").text
+    company_website_link = company_page.at(".bp-site-link")
     company_website_link_hidden = company_website_link.parent.attributes["style"].value.include? "display:none"
     if company_website_link_hidden
       puts "Adding company #{index + 1} (#{company_name}) because it doesn't have a website..."
       temp_companies_info.push({
         name: company_name,
-        address: company_page.at("[text()*='כתובת:']").text.gsub("\n", "").gsub("\r", "").gsub("\t", ""),
-        phone: company_page.at("[text()*='נייד:']").parent.text.gsub("נייד:", ""),
+        address: company_page.at(".bp-business-location").text.gsub("\n", "").gsub("\r", "").gsub("\t", ""),
+        phone: company_page.at(".bp-phone-number").text,
+        mobile: company_page.at(".bp-mobile-phone").text,
         url: company_page.uri.to_s
       })
     else
@@ -68,15 +70,15 @@ number_of_pages.times do |num_of_page|
   companies_info.push(temp_companies_info)
 
   if num_of_page < number_of_pages
-    pagination = b144_current_page.at("#center_tdPagesNumTblFooter")
-    current_page = pagination.at(".td_paging_on").text.to_i
+    pagination = b144_current_page.at(".results-navigation")
+    current_page = pagination.at(".inner-nav-link--active").text.to_i
     if current_page <= 2
       next_page_position = current_page
     else
       next_page_position = 3
     end
-    puts "Possible next page -------> #{pagination.search(".td_plain")[next_page_position].text.to_i}"
-    next_page_link = pagination.search(".td_plain")[next_page_position].at("a").attributes["href"].value
+    puts "Possible next page -------> #{pagination.search(".inner-nav-link")[next_page_position].text.to_i}"
+    next_page_link = pagination.search(".inner-nav-link")[next_page_position].attributes["href"].value
     b144_current_page = agent.get(next_page_link)
   end
 
